@@ -14,6 +14,12 @@ interface ChatMessage {
   content: string;
 }
 
+interface AgentTriggerStatus {
+  tool: string;
+  status: 'running' | 'complete';
+  timestamp: number;
+}
+
 interface ConversationMeta {
   id: string;
   title: string;
@@ -28,6 +34,7 @@ export default function ChatPage() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [agentStatuses, setAgentStatuses] = useState<AgentTriggerStatus[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [regime, setRegime] = useState<string | null>(null);
 
@@ -135,6 +142,18 @@ export default function ChatPage() {
               if (data.type === 'text' && data.text) {
                 fullText += data.text;
                 setStreamingContent(fullText);
+              } else if (data.type === 'tool_status' && data.tool) {
+                const isTrigger = data.tool.startsWith('trigger_');
+                if (isTrigger) {
+                  setAgentStatuses((prev) => [
+                    ...prev.filter((s) => s.tool !== data.tool),
+                    {
+                      tool: data.tool!,
+                      status: (data.status as 'running' | 'complete') || 'running',
+                      timestamp: Date.now(),
+                    },
+                  ]);
+                }
               } else if (data.type === 'done') {
                 if (data.conversationId) {
                   setConversationId(data.conversationId);
@@ -288,6 +307,7 @@ export default function ChatPage() {
           messages={messages}
           streamingContent={streamingContent}
           isStreaming={isStreaming}
+          agentStatuses={agentStatuses}
         />
 
         {/* Input */}

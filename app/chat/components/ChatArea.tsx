@@ -9,22 +9,62 @@ interface ChatMessage {
   content: string;
 }
 
+interface AgentTriggerStatus {
+  tool: string;
+  status: 'running' | 'complete';
+  timestamp: number;
+}
+
 interface ChatAreaProps {
   messages: ChatMessage[];
   streamingContent: string;
   isStreaming: boolean;
+  agentStatuses?: AgentTriggerStatus[];
+}
+
+const TOOL_LABELS: Record<string, string> = {
+  trigger_agent_run: 'Agent Run',
+  trigger_full_cycle: 'Full Cycle',
+};
+
+function AgentStatusCard({ statuses }: { statuses: AgentTriggerStatus[] }) {
+  if (statuses.length === 0) return null;
+
+  // Only show the most recent trigger
+  const latest = statuses[statuses.length - 1];
+  const label = TOOL_LABELS[latest.tool] || latest.tool;
+  const isComplete = latest.status === 'complete';
+
+  return (
+    <div className="flex justify-start mb-4">
+      <div className="max-w-[85%] md:max-w-[75%] rounded-2xl px-4 py-3 bg-plum-deep/5 border border-plum/20 text-sm">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-base">{isComplete ? '✓' : '🔄'}</span>
+          <span className="font-semibold text-plum-deep">
+            {isComplete ? 'Triggered' : 'Triggering'}: {label}
+          </span>
+        </div>
+        <p className="text-muted text-xs leading-relaxed">
+          {isComplete
+            ? 'Agents are running on the server. Ask me for results in a few minutes.'
+            : 'Sending request to agent server...'}
+        </p>
+      </div>
+    </div>
+  );
 }
 
 export default function ChatArea({
   messages,
   streamingContent,
   isStreaming,
+  agentStatuses = [],
 }: ChatAreaProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamingContent]);
+  }, [messages, streamingContent, agentStatuses]);
 
   return (
     <div className="flex-1 overflow-y-auto chat-scroll px-4 py-6">
@@ -59,6 +99,11 @@ export default function ChatArea({
         {messages.map((msg) => (
           <MessageBubble key={msg.id} role={msg.role} content={msg.content} />
         ))}
+
+        {/* Agent trigger status card */}
+        {isStreaming && agentStatuses.length > 0 && (
+          <AgentStatusCard statuses={agentStatuses} />
+        )}
 
         {/* Streaming message */}
         {isStreaming && (

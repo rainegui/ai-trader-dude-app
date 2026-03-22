@@ -16,6 +16,8 @@ import { readGitHubFile } from '@/lib/github';
 export const runtime = 'nodejs';
 export const maxDuration = 120;
 
+const TOOL_TIMEOUT_MS = 15000;
+
 // Custom tool definitions for ATD capabilities
 const customTools: Anthropic.Tool[] = [
   {
@@ -88,6 +90,19 @@ const customTools: Anthropic.Tool[] = [
   },
 ];
 
+async function executeWithTimeout<T>(
+  fn: () => Promise<T>,
+  timeoutMs = TOOL_TIMEOUT_MS
+): Promise<T> {
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(
+      () => reject(new Error('Tool call timed out — agent server may be unreachable')),
+      timeoutMs
+    )
+  );
+  return Promise.race([fn(), timeout]);
+}
+
 async function handleToolCall(
   toolName: string,
   toolInput: Record<string, unknown>
@@ -97,11 +112,14 @@ async function handleToolCall(
       const agents = toolInput.agents as string[];
       const context = toolInput.context as string | undefined;
       try {
-        const result = await triggerAgentRun({ agents, context });
+        const result = await executeWithTimeout(() =>
+          triggerAgentRun({ agents, context })
+        );
         return JSON.stringify(result);
       } catch (error) {
         return JSON.stringify({
           error: error instanceof Error ? error.message : 'Failed to trigger agents',
+          hint: 'Agent server may be unreachable. Work with existing outputs instead.',
         });
       }
     }
@@ -109,11 +127,12 @@ async function handleToolCall(
     case 'trigger_full_cycle': {
       const cycle = toolInput.cycle as string | undefined;
       try {
-        const result = await triggerFullCycle(cycle);
+        const result = await executeWithTimeout(() => triggerFullCycle(cycle));
         return JSON.stringify(result);
       } catch (error) {
         return JSON.stringify({
           error: error instanceof Error ? error.message : 'Failed to trigger full cycle',
+          hint: 'Agent server may be unreachable. Work with existing outputs instead.',
         });
       }
     }
@@ -121,7 +140,7 @@ async function handleToolCall(
     case 'check_agent_status': {
       const runId = toolInput.run_id as string;
       try {
-        const result = await getRunStatus(runId);
+        const result = await executeWithTimeout(() => getRunStatus(runId));
         return JSON.stringify(result);
       } catch (error) {
         return JSON.stringify({
@@ -133,7 +152,10 @@ async function handleToolCall(
     case 'read_github_file': {
       const path = toolInput.path as string;
       try {
-        const content = await readGitHubFile(path);
+        const content = await executeWithTimeout(
+          () => readGitHubFile(path),
+          10000
+        );
         if (content === null) {
           return JSON.stringify({ error: `File not found: ${path}` });
         }
@@ -209,7 +231,7 @@ export async function POST(req: Request) {
     const readable = new ReadableStream({
       async start(controller) {
         let fullResponse = '';
-        const MAX_TOOL_ROUNDS = 5;
+        const MAX_TOOL_ROUNDS = 10;
 
         try {
           for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
