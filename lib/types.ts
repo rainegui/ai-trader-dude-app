@@ -57,10 +57,13 @@ export interface Theme {
 }
 
 export interface SSEMessage {
-  type: 'text' | 'done' | 'error';
+  type: 'text' | 'done' | 'error' | 'tool_status';
   text?: string;
   conversationId?: string;
   error?: string;
+  tool?: string;
+  status?: string;
+  result?: unknown;
 }
 
 export interface MemoryEntry {
