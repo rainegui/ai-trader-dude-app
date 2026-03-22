@@ -62,6 +62,7 @@ export async function buildSystemPrompt(): Promise<string> {
   const [
     atdSop,
     tradingFundamentals,
+    tradeHistory,
     systemPromptContext,
     atdMemory,
     portfolio,
@@ -76,6 +77,7 @@ export async function buildSystemPrompt(): Promise<string> {
   ] = await Promise.all([
     readGitHubFile('state/atd-sop.md'),
     readGitHubFile('state/atd-knowledge/trading-fundamentals.md'),
+    readGitHubFile('state/atd-knowledge/trade-history.md'),
     readGitHubFile('state/system-prompt-context.md'),
     readGitHubFile('state/atd-memory.md'),
     readGitHubFile('state/portfolio.json'),
@@ -100,6 +102,8 @@ export async function buildSystemPrompt(): Promise<string> {
   return `${atdSop || ''}
 
 ${tradingFundamentals || ''}
+
+${tradeHistory || ''}
 
 ${systemPromptContext || ''}
 
