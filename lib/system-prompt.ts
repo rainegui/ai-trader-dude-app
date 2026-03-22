@@ -60,7 +60,10 @@ function getAgeString(generatedAt: string): string {
 export async function buildSystemPrompt(): Promise<string> {
   // Fetch from GitHub in parallel
   const [
+    atdSop,
+    tradingFundamentals,
     systemPromptContext,
+    atdMemory,
     portfolio,
     activeThemes,
     watchlist,
@@ -71,7 +74,10 @@ export async function buildSystemPrompt(): Promise<string> {
     gameTheoryOutput,
     technicalOutput,
   ] = await Promise.all([
+    readGitHubFile('state/atd-sop.md'),
+    readGitHubFile('state/atd-knowledge/trading-fundamentals.md'),
     readGitHubFile('state/system-prompt-context.md'),
+    readGitHubFile('state/atd-memory.md'),
     readGitHubFile('state/portfolio.json'),
     readGitHubFile('state/active-themes.json'),
     readGitHubFile('state/watchlist.json'),
@@ -91,7 +97,13 @@ export async function buildSystemPrompt(): Promise<string> {
     // Supabase may be unavailable
   }
 
-  return `${systemPromptContext || ''}
+  return `${atdSop || ''}
+
+${tradingFundamentals || ''}
+
+${systemPromptContext || ''}
+
+${atdMemory || ''}
 
 [IDENTITY]
 You are AI Trader Dude (ATD). You are a trading strategist — not an assistant, a strategist who has opinions.
