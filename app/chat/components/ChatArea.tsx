@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import MessageBubble from './MessageBubble';
+import ThinkingIndicator from './ThinkingIndicator';
 
 interface ChatMessage {
   id: string;
@@ -19,6 +20,7 @@ interface ChatAreaProps {
   messages: ChatMessage[];
   streamingContent: string;
   isStreaming: boolean;
+  isWaiting?: boolean;
   agentStatuses?: AgentTriggerStatus[];
 }
 
@@ -58,6 +60,7 @@ export default function ChatArea({
   messages,
   streamingContent,
   isStreaming,
+  isWaiting = false,
   agentStatuses = [],
 }: ChatAreaProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -87,7 +90,7 @@ export default function ChatArea({
               </svg>
             </div>
             <h2 className="text-xl font-semibold text-plum-deep mb-2">
-              G&apos;day.
+              Hey Raine.
             </h2>
             <p className="text-muted text-sm max-w-xs">
               What are we looking at today? Ask me about markets, your
@@ -100,13 +103,16 @@ export default function ChatArea({
           <MessageBubble key={msg.id} role={msg.role} content={msg.content} />
         ))}
 
+        {/* Thinking indicator — visible while waiting for first token */}
+        {isWaiting && agentStatuses.length === 0 && <ThinkingIndicator />}
+
         {/* Agent trigger status card */}
         {isStreaming && agentStatuses.length > 0 && (
           <AgentStatusCard statuses={agentStatuses} />
         )}
 
-        {/* Streaming message */}
-        {isStreaming && (
+        {/* Streaming message — only show once content starts arriving */}
+        {isStreaming && !isWaiting && (
           <MessageBubble
             role="assistant"
             content={streamingContent || ''}

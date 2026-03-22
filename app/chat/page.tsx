@@ -32,6 +32,7 @@ export default function ChatPage() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationMeta[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isWaiting, setIsWaiting] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [agentStatuses, setAgentStatuses] = useState<AgentTriggerStatus[]>([]);
@@ -106,6 +107,7 @@ export default function ChatPage() {
       };
       setMessages((prev) => [...prev, userMsg]);
       setIsStreaming(true);
+      setIsWaiting(true);
       setStreamingContent('');
 
       try {
@@ -141,6 +143,7 @@ export default function ChatPage() {
 
               if (data.type === 'text' && data.text) {
                 fullText += data.text;
+                setIsWaiting(false);
                 setStreamingContent(fullText);
               } else if (data.type === 'tool_status' && data.tool) {
                 const isTrigger = data.tool.startsWith('trigger_');
@@ -186,6 +189,7 @@ export default function ChatPage() {
         setMessages((prev) => [...prev, errMsg]);
       } finally {
         setIsStreaming(false);
+        setIsWaiting(false);
         setStreamingContent('');
       }
     },
@@ -307,6 +311,7 @@ export default function ChatPage() {
           messages={messages}
           streamingContent={streamingContent}
           isStreaming={isStreaming}
+          isWaiting={isWaiting}
           agentStatuses={agentStatuses}
         />
 
