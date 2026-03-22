@@ -58,6 +58,25 @@ function getAgeString(generatedAt: string): string {
 }
 
 export async function buildSystemPrompt(): Promise<string> {
+  // Compute current Sydney date/time for the system prompt
+  const now = new Date().toLocaleString('en-AU', {
+    timeZone: 'Australia/Sydney',
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+  const tzAbbr = new Date()
+    .toLocaleString('en-AU', {
+      timeZone: 'Australia/Sydney',
+      timeZoneName: 'short',
+    })
+    .split(' ')
+    .pop();
+
   // Fetch from GitHub in parallel
   const [
     atdSop,
@@ -74,6 +93,7 @@ export async function buildSystemPrompt(): Promise<string> {
     newsScoutOutput,
     gameTheoryOutput,
     technicalOutput,
+    unicornPipeline,
   ] = await Promise.all([
     readGitHubFile('state/atd-sop.md'),
     readGitHubFile('state/atd-knowledge/trading-fundamentals.md'),
@@ -89,6 +109,7 @@ export async function buildSystemPrompt(): Promise<string> {
     readGitHubFile('outputs/news-scout/latest.json'),
     readGitHubFile('outputs/game-theory/latest.json'),
     readGitHubFile('outputs/technical/latest.json'),
+    readGitHubFile('state/unicorn-pipeline.json'),
   ]);
 
   // Fetch memory from Supabase
@@ -99,7 +120,10 @@ export async function buildSystemPrompt(): Promise<string> {
     // Supabase may be unavailable
   }
 
-  return `${atdSop || ''}
+  return `Current date and time: ${now} ${tzAbbr}
+Raine is in Sydney, Australia. Always use Sydney time for timestamps.
+
+${atdSop || ''}
 
 ${tradingFundamentals || ''}
 
@@ -121,7 +145,7 @@ Voice and tone:
 - Challenge the user when they contradict themselves or ignore a risk.
 - Support them when their reasoning is sound.
 - Admit uncertainty. "I don't have a strong view on this" is valid.
-- Australian spelling. AEDT timestamps.
+- Australian spelling. ${tzAbbr} timestamps.
 
 You are NOT a generic chatbot. You have strong views informed by the agent data below. You push back when something doesn't make sense. You propose ideas proactively. You explain the WHY behind market moves, not just the what.
 
@@ -143,6 +167,9 @@ ${activeThemes || 'No active themes'}
 
 [WATCHLIST]
 ${watchlist || 'No watchlist data'}
+
+[UNICORN PIPELINE]
+${unicornPipeline || 'No unicorn pipeline data'}
 
 [CURRENT REGIME]
 ${regime || 'No regime data'}
@@ -183,6 +210,7 @@ You can:
 - Update active themes: same process
 - Update portfolio: same process
 - Log trades to the trade log database
+- Update unicorn-pipeline.json when candidates are discovered, evaluated, promoted, passed, or killed
 
 [AGENT TRIGGERING RULES — CRITICAL]
 Agent runs take 2-15 minutes. You CANNOT wait for them within a single response.
@@ -195,6 +223,17 @@ Rules:
 - NEVER enter a loop of: trigger → poll → poll → poll. One trigger call, one immediate response. That's it.
 - For portfolio reports or audits using EXISTING data: read the GitHub files you need and synthesise. No triggering needed. If you hit the tool limit, output what you have and offer to continue in the next message.
 - If you need fresh data AND existing data is stale, trigger the agents and respond with what you have now, noting that fresh data is on the way.
+
+"ALL AGENTS" MEANS ALL AGENTS:
+- If the user says "all agents", "every agent", "full audit", "complete picture", or "trigger everything" — trigger ALL of these: News Scout, Economist, Game Theory, and Technical Analyst. Every single one.
+- If the user provides specific context for some agents (e.g., "Economist for regime, TA on PANW"), that's helpful direction — but it does NOT mean "only those agents." If they said "all", trigger all. Include the ones they didn't mention too.
+- The News Scout is critical in fast-moving situations (wars, crises, earnings season). Never skip it when the user asks for a full picture.
+- If an agent can't be triggered (server down, error), explicitly tell the user which agent failed and why. Don't silently skip it.
+
+STALE DATA AWARENESS:
+- When presenting analysis using agent outputs, check the timestamp on each output.
+- If any output is more than 6 hours old, flag it clearly: "Note: the News Scout data is from [time], about [X] hours ago. Things may have changed — want me to trigger a fresh scan?"
+- On weekends especially, news can break between scheduled runs. Always mention the age of the data when presenting weekend analysis.
 
 [IMPORTANT RULES]
 - Never make up data. If you don't have agent output for something, say so.
