@@ -94,6 +94,8 @@ export async function buildSystemPrompt(): Promise<string> {
     gameTheoryOutput,
     technicalOutput,
     unicornPipeline,
+    tradingSystemRef,
+    earlyWarningDashboard,
   ] = await Promise.all([
     readGitHubFile('state/atd-sop.md'),
     readGitHubFile('state/atd-knowledge/trading-fundamentals.md'),
@@ -110,6 +112,8 @@ export async function buildSystemPrompt(): Promise<string> {
     readGitHubFile('outputs/game-theory/latest.json'),
     readGitHubFile('outputs/technical/latest.json'),
     readGitHubFile('state/unicorn-pipeline.json'),
+    readGitHubFile('state/atd-knowledge/trading-system-reference.md'),
+    readGitHubFile('state/atd-knowledge/early-warning-dashboard.md'),
   ]);
 
   // Fetch memory from Supabase
@@ -171,6 +175,12 @@ ${watchlist || 'No watchlist data'}
 [UNICORN PIPELINE]
 ${unicornPipeline || 'No unicorn pipeline data'}
 
+[TRADING SYSTEM REFERENCE — SUMMARY]
+${tradingSystemRef ? 'The Trading System Reference (state/atd-knowledge/trading-system-reference.md) defines the sentiment dislocation methodology for the short-term book. Key principles: the dislocation test (is the market wrong about THIS name?), sentiment completion gate (when narrative normalises, the trade is done), fresh entry gate (would I enter today?), and mechanical exits (stops, time stops, kill switches fire regardless of feelings). Use this document for theme evaluation, exit discipline, and selloff classification. Read it via GitHub file read when evaluating new themes or checking exit rules.' : 'Trading System Reference not available'}
+
+[EARLY WARNING DASHBOARD — SUMMARY]
+${earlyWarningDashboard ? 'The Early Warning Dashboard (state/atd-knowledge/early-warning-dashboard.md) defines a five-category fragility scoring system. The Economist agent produces live dashboard scores in its early_warning_dashboard output field each cycle. Reference the Economist output when discussing market fragility or pre-event conditions. Categories: Credit Stress (30%), Macro Fragility (25%), Complacency (20%), Positioning (15%), Technical (10%).' : 'Early Warning Dashboard not available'}
+
 [CURRENT REGIME]
 ${regime || 'No regime data'}
 
@@ -211,6 +221,8 @@ You can:
 - Update portfolio: same process
 - Log trades to the trade log database
 - Update unicorn-pipeline.json when candidates are discovered, evaluated, promoted, passed, or killed
+- Reference the Trading System Reference for theme evaluation, exit discipline, and selloff classification
+- Reference the Early Warning Dashboard when discussing market fragility or pre-event conditions
 
 [AGENT TRIGGERING RULES — CRITICAL]
 Agent runs take 2-15 minutes. You CANNOT wait for them within a single response.
