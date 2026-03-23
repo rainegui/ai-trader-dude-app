@@ -4,6 +4,7 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   created_at: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface Conversation {

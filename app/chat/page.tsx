@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import ChatArea from './components/ChatArea';
 import InputBar from './components/InputBar';
+import type { FileAttachment } from './components/InputBar';
 import ContextDrawer from './components/ContextDrawer';
 import { RegimeBadge, ConversationList } from './components/DataCards';
 import type { ConversationEntry } from './components/DataCards';
@@ -13,6 +14,10 @@ interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  fileAttached?: {
+    name: string;
+    type: string;
+  };
 }
 
 interface AgentTriggerStatus {
@@ -20,6 +25,15 @@ interface AgentTriggerStatus {
   status: 'running' | 'complete';
   timestamp: number;
 }
+
+const MAX_FILE_SIZE = 3 * 1024 * 1024;
+const ACCEPTED_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'application/pdf',
+];
 
 export default function ChatPage() {
   const router = useRouter();
@@ -34,6 +48,8 @@ export default function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [regime, setRegime] = useState<string | null>(null);
   const [loadingConversation, setLoadingConversation] = useState(false);
+  const [pendingFile, setPendingFile] = useState<FileAttachment | null>(null);
+  const [hasFileInFlight, setHasFileInFlight] = useState(false);
 
   // Auth check
   useEffect(() => {
@@ -92,10 +108,16 @@ export default function ChatPage() {
       const data = await res.json();
 
       const loadedMessages: ChatMessage[] = data.map(
-        (m: { id: string; role: string; content: string }) => ({
+        (m: { id: string; role: string; content: string; metadata?: Record<string, unknown> }) => ({
           id: m.id,
           role: m.role as 'user' | 'assistant',
           content: m.content,
+          fileAttached: m.metadata && (m.metadata as Record<string, unknown>).file_attached
+            ? {
+                name: (m.metadata as Record<string, unknown>).file_name as string,
+                type: (m.metadata as Record<string, unknown>).file_type as string,
+              }
+            : undefined,
         })
       );
 
@@ -122,10 +144,8 @@ export default function ChatPage() {
         body: JSON.stringify({ is_deleted: true }),
       });
 
-      // Remove from local list immediately
       setConversations((prev) => prev.filter((c) => c.id !== convId));
 
-      // If we're deleting the active conversation, start fresh
       if (convId === conversationId) {
         startNewConversation();
       }
@@ -134,14 +154,11 @@ export default function ChatPage() {
     }
   }
 
-  // Refresh conversation list after a message exchange completes
   const refreshConversationList = useCallback(
     (activeConvId: string, firstUserMessage?: string) => {
-      // Update the conversation in the local list
       setConversations((prev) => {
         const existing = prev.find((c) => c.id === activeConvId);
         if (existing) {
-          // Move to top and update timestamp
           return [
             {
               ...existing,
@@ -151,7 +168,6 @@ export default function ChatPage() {
             ...prev.filter((c) => c.id !== activeConvId),
           ];
         } else {
-          // New conversation — add to top
           return [
             {
               id: activeConvId,
@@ -167,26 +183,72 @@ export default function ChatPage() {
     []
   );
 
+  // Handle file drops from ChatArea
+  const handleFileDrop = useCallback((file: File) => {
+    if (!ACCEPTED_TYPES.includes(file.type)) return;
+    if (file.size > MAX_FILE_SIZE) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64Data = result.split(',')[1];
+      const isImage = file.type.startsWith('image/');
+      const previewUrl = isImage ? URL.createObjectURL(file) : null;
+
+      setPendingFile({
+        name: file.name,
+        mimeType: file.type,
+        size: file.size,
+        base64Data,
+        previewUrl,
+      });
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
   const sendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, file?: FileAttachment) => {
       if (isStreaming) return;
 
-      // Add user message immediately
+      // Use file from arg or from drag-and-drop pending
+      const attachedFile = file || pendingFile;
+      setPendingFile(null);
+
+      const displayContent = content || (attachedFile ? `[Attached: ${attachedFile.name}]` : '');
       const userMsg: ChatMessage = {
         id: `user-${Date.now()}`,
         role: 'user',
-        content,
+        content: displayContent,
+        fileAttached: attachedFile
+          ? { name: attachedFile.name, type: attachedFile.mimeType }
+          : undefined,
       };
       setMessages((prev) => [...prev, userMsg]);
       setIsStreaming(true);
       setIsWaiting(true);
       setStreamingContent('');
+      setHasFileInFlight(!!attachedFile);
 
       try {
+        // Build request payload
+        const payload: Record<string, unknown> = {
+          message: content || 'Please analyse this file.',
+          conversationId,
+        };
+
+        if (attachedFile) {
+          payload.file = {
+            name: attachedFile.name,
+            mimeType: attachedFile.mimeType,
+            size: attachedFile.size,
+            base64Data: attachedFile.base64Data,
+          };
+        }
+
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: content, conversationId }),
+          body: JSON.stringify(payload),
         });
 
         if (!res.ok) {
@@ -216,6 +278,7 @@ export default function ChatPage() {
               if (data.type === 'text' && data.text) {
                 fullText += data.text;
                 setIsWaiting(false);
+                setHasFileInFlight(false);
                 setStreamingContent(fullText);
               } else if (data.type === 'tool_status' && data.tool) {
                 const isTrigger = data.tool.startsWith('trigger_');
@@ -232,11 +295,10 @@ export default function ChatPage() {
               } else if (data.type === 'done') {
                 if (data.conversationId) {
                   setConversationId(data.conversationId);
-                  // Refresh sidebar — first message is the title source
                   const isFirst = !conversationId;
                   refreshConversationList(
                     data.conversationId,
-                    isFirst ? content : undefined
+                    isFirst ? (content || attachedFile?.name) : undefined
                   );
                 }
               } else if (data.type === 'error') {
@@ -249,7 +311,6 @@ export default function ChatPage() {
           }
         }
 
-        // Finalise: move streaming content to a proper message
         if (fullText) {
           const assistantMsg: ChatMessage = {
             id: `assistant-${Date.now()}`,
@@ -258,7 +319,6 @@ export default function ChatPage() {
           };
           setMessages((prev) => [...prev, assistantMsg]);
 
-          // Update last message preview in the sidebar
           if (conversationId) {
             setConversations((prev) =>
               prev.map((c) =>
@@ -284,9 +344,10 @@ export default function ChatPage() {
         setIsStreaming(false);
         setIsWaiting(false);
         setStreamingContent('');
+        setHasFileInFlight(false);
       }
     },
-    [isStreaming, conversationId, refreshConversationList]
+    [isStreaming, conversationId, pendingFile, refreshConversationList]
   );
 
   return (
@@ -407,7 +468,9 @@ export default function ChatPage() {
           streamingContent={streamingContent}
           isStreaming={isStreaming}
           isWaiting={isWaiting}
+          hasFileAttachment={hasFileInFlight}
           agentStatuses={agentStatuses}
+          onFileDrop={handleFileDrop}
         />
 
         {/* Input */}

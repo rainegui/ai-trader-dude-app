@@ -172,9 +172,20 @@ async function handleToolCall(
   }
 }
 
+interface FilePayload {
+  name: string;
+  mimeType: string;
+  size: number;
+  base64Data: string;
+}
+
 export async function POST(req: Request) {
   try {
-    const { message, conversationId } = await req.json();
+    const { message, conversationId, file } = await req.json() as {
+      message: string;
+      conversationId?: string;
+      file?: FilePayload;
+    };
 
     // Get or create conversation
     let convId = conversationId;
@@ -186,9 +197,17 @@ export async function POST(req: Request) {
       }
     }
 
-    // Save user message
+    // Save user message (with file metadata if present)
     try {
-      await saveMessage(convId, 'user', message);
+      const metadata = file
+        ? {
+            file_attached: true,
+            file_name: file.name,
+            file_type: file.mimeType,
+            file_size: file.size,
+          }
+        : undefined;
+      await saveMessage(convId, 'user', message, metadata);
     } catch {
       // Continue without persistence
     }
@@ -227,6 +246,46 @@ export async function POST(req: Request) {
       role: m.role as 'user' | 'assistant',
       content: m.content,
     }));
+
+    // If a file is attached, replace the last user message with multi-part content
+    if (file && messages.length > 0) {
+      const lastIdx = messages.length - 1;
+      const lastMsg = messages[lastIdx];
+      if (lastMsg.role === 'user') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const contentBlocks: any[] = [];
+
+        if (file.mimeType === 'application/pdf') {
+          contentBlocks.push({
+            type: 'document',
+            source: {
+              type: 'base64',
+              media_type: 'application/pdf',
+              data: file.base64Data,
+            },
+          });
+        } else {
+          contentBlocks.push({
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: file.mimeType,
+              data: file.base64Data,
+            },
+          });
+        }
+
+        contentBlocks.push({
+          type: 'text',
+          text: (typeof lastMsg.content === 'string' ? lastMsg.content : message) || 'Please analyse this file.',
+        });
+
+        messages[lastIdx] = {
+          role: 'user',
+          content: contentBlocks,
+        };
+      }
+    }
 
     const readable = new ReadableStream({
       async start(controller) {

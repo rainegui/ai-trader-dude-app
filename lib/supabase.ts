@@ -47,13 +47,16 @@ export async function getConversationMessages(
 export async function saveMessage(
   conversationId: string,
   role: string,
-  content: string
+  content: string,
+  metadata?: Record<string, unknown>
 ): Promise<void> {
-  await supabase.from('messages').insert({
+  const row: Record<string, unknown> = {
     conversation_id: conversationId,
     role,
     content,
-  });
+  };
+  if (metadata) row.metadata = metadata;
+  await supabase.from('messages').insert(row);
 
   // Update conversation's updated_at
   await supabase

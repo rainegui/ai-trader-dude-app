@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import MessageBubble from './MessageBubble';
 import ThinkingIndicator from './ThinkingIndicator';
 
@@ -8,6 +8,10 @@ interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  fileAttached?: {
+    name: string;
+    type: string;
+  };
 }
 
 interface AgentTriggerStatus {
@@ -21,7 +25,9 @@ interface ChatAreaProps {
   streamingContent: string;
   isStreaming: boolean;
   isWaiting?: boolean;
+  hasFileAttachment?: boolean;
   agentStatuses?: AgentTriggerStatus[];
+  onFileDrop?: (file: File) => void;
 }
 
 const TOOL_LABELS: Record<string, string> = {
@@ -61,16 +67,98 @@ export default function ChatArea({
   streamingContent,
   isStreaming,
   isWaiting = false,
+  hasFileAttachment = false,
   agentStatuses = [],
+  onFileDrop,
 }: ChatAreaProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounterRef = useRef(0);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingContent, agentStatuses]);
 
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDragging(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+      dragCounterRef.current = 0;
+
+      const file = e.dataTransfer.files?.[0];
+      if (file && onFileDrop) {
+        onFileDrop(file);
+      }
+    },
+    [onFileDrop]
+  );
+
+  // Determine thinking text
+  const thinkingText = hasFileAttachment
+    ? '\u{1F4CE} Processing file...'
+    : undefined;
+
   return (
-    <div className="flex-1 overflow-y-auto chat-scroll px-4 py-6">
+    <div
+      className={`flex-1 overflow-y-auto chat-scroll px-4 py-6 relative transition-colors ${
+        isDragging ? 'bg-plum-light/20' : ''
+      }`}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {/* Drag overlay */}
+      {isDragging && (
+        <div className="absolute inset-4 border-2 border-dashed border-plum/40 rounded-2xl flex items-center justify-center bg-plum-light/10 z-10 pointer-events-none">
+          <div className="text-center">
+            <svg
+              className="w-10 h-10 text-plum/50 mx-auto mb-2"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+              />
+            </svg>
+            <p className="text-sm text-plum font-medium">
+              Drop file to attach
+            </p>
+            <p className="text-xs text-muted mt-0.5">
+              Images or PDFs, up to 3MB
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-2xl mx-auto">
         {messages.length === 0 && !isStreaming && (
           <div className="flex flex-col items-center justify-center h-full min-h-[50vh] text-center">
@@ -100,11 +188,18 @@ export default function ChatArea({
         )}
 
         {messages.map((msg) => (
-          <MessageBubble key={msg.id} role={msg.role} content={msg.content} />
+          <MessageBubble
+            key={msg.id}
+            role={msg.role}
+            content={msg.content}
+            fileAttached={msg.fileAttached}
+          />
         ))}
 
         {/* Thinking indicator — visible while waiting for first token */}
-        {isWaiting && agentStatuses.length === 0 && <ThinkingIndicator />}
+        {isWaiting && agentStatuses.length === 0 && (
+          <ThinkingIndicator statusText={thinkingText} />
+        )}
 
         {/* Agent trigger status card */}
         {isStreaming && agentStatuses.length > 0 && (
