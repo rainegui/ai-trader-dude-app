@@ -14,6 +14,12 @@ interface ChatMessage {
     name: string;
     type: string;
   };
+  report?: {
+    title: string;
+    url: string;
+    format: string;
+    expires: string;
+  };
 }
 
 interface AgentTriggerStatus {
@@ -210,6 +216,7 @@ export default function ChatArea({
             role={msg.role}
             content={msg.content}
             fileAttached={msg.fileAttached}
+            report={msg.report}
           />
         ))}
 

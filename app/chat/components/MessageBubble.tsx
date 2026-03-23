@@ -3,6 +3,13 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
+interface ReportInfo {
+  title: string;
+  url: string;
+  format: string;
+  expires: string;
+}
+
 interface MessageBubbleProps {
   role: 'user' | 'assistant';
   content: string;
@@ -11,6 +18,67 @@ interface MessageBubbleProps {
     name: string;
     type: string;
   };
+  report?: ReportInfo;
+}
+
+function ReportCard({ report }: { report: ReportInfo }) {
+  const isExpired = report.expires
+    ? new Date(report.expires).getTime() < Date.now()
+    : false;
+
+  return (
+    <div className="mt-3 rounded-xl border border-plum/20 bg-plum-light/40 px-4 py-3">
+      <div className="flex items-center gap-2.5">
+        <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-plum/10 flex items-center justify-center">
+          <svg
+            className="w-5 h-5 text-plum"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+            />
+          </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-plum-deep truncate">
+            {report.title}
+          </p>
+          {isExpired ? (
+            <p className="text-xs text-muted mt-0.5">
+              Report expired — ask ATD to regenerate
+            </p>
+          ) : (
+            <a
+              href={report.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 mt-1.5 px-3 py-1.5 rounded-lg bg-plum text-white text-xs font-medium hover:bg-plum-deep transition-colors"
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                />
+              </svg>
+              Download Report
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function MessageBubble({
@@ -18,6 +86,7 @@ export default function MessageBubble({
   content,
   isStreaming,
   fileAttached,
+  report,
 }: MessageBubbleProps) {
   const isUser = role === 'user';
 
@@ -84,6 +153,9 @@ export default function MessageBubble({
             )}
           </div>
         )}
+
+        {/* Report download card */}
+        {report && !isUser && <ReportCard report={report} />}
       </div>
     </div>
   );

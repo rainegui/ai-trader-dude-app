@@ -20,6 +20,12 @@ interface ChatMessage {
     name: string;
     type: string;
   };
+  report?: {
+    title: string;
+    url: string;
+    format: string;
+    expires: string;
+  };
 }
 
 interface AgentTriggerStatus {
@@ -112,17 +118,28 @@ export default function ChatPage() {
       const data = await res.json();
 
       const loadedMessages: ChatMessage[] = data.map(
-        (m: { id: string; role: string; content: string; metadata?: Record<string, unknown> }) => ({
-          id: m.id,
-          role: m.role as 'user' | 'assistant',
-          content: m.content,
-          fileAttached: m.metadata && (m.metadata as Record<string, unknown>).file_attached
-            ? {
-                name: (m.metadata as Record<string, unknown>).file_name as string,
-                type: (m.metadata as Record<string, unknown>).file_type as string,
-              }
-            : undefined,
-        })
+        (m: { id: string; role: string; content: string; metadata?: Record<string, unknown> }) => {
+          const meta = m.metadata as Record<string, unknown> | undefined;
+          return {
+            id: m.id,
+            role: m.role as 'user' | 'assistant',
+            content: m.content,
+            fileAttached: meta?.file_attached
+              ? {
+                  name: meta.file_name as string,
+                  type: meta.file_type as string,
+                }
+              : undefined,
+            report: meta?.report_generated
+              ? {
+                  title: meta.report_title as string,
+                  url: meta.report_url as string,
+                  format: meta.report_format as string,
+                  expires: meta.report_expires as string,
+                }
+              : undefined,
+          };
+        }
       );
 
       setMessages(loadedMessages);
@@ -265,6 +282,7 @@ export default function ChatPage() {
         const decoder = new TextDecoder();
         let buffer = '';
         let fullText = '';
+        let pendingReport: ChatMessage['report'] | undefined;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -320,6 +338,13 @@ export default function ChatPage() {
                     return updated;
                   });
                 }
+              } else if (data.type === 'report_ready' && data.url) {
+                pendingReport = {
+                  title: data.title || 'Report',
+                  url: data.url,
+                  format: data.format || 'markdown',
+                  expires: data.expires || '',
+                };
               } else if (data.type === 'done') {
                 if (data.conversationId) {
                   setConversationId(data.conversationId);
@@ -344,6 +369,7 @@ export default function ChatPage() {
             id: `assistant-${Date.now()}`,
             role: 'assistant',
             content: fullText,
+            report: pendingReport,
           };
           setMessages((prev) => [...prev, assistantMsg]);
 

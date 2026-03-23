@@ -64,7 +64,7 @@ export interface Theme {
 }
 
 export interface SSEMessage {
-  type: 'text' | 'done' | 'error' | 'tool_status';
+  type: 'text' | 'done' | 'error' | 'tool_status' | 'report_ready';
   text?: string;
   conversationId?: string;
   error?: string;
@@ -72,6 +72,11 @@ export interface SSEMessage {
   status?: string;
   result?: unknown;
   agents?: string[];
+  // Report fields
+  title?: string;
+  url?: string;
+  format?: string;
+  expires?: string;
 }
 
 export interface MemoryEntry {

@@ -88,6 +88,32 @@ const customTools: Anthropic.Tool[] = [
       required: ['path'],
     },
   },
+  {
+    name: 'generate_report',
+    description:
+      'Generate a downloadable report document. Use when Raine asks for a written report, summary document, portfolio review, or any analysis she wants to save, share, or reference later.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        title: {
+          type: 'string',
+          description: 'Report title (e.g., "Portfolio Report — March 2026")',
+        },
+        content: {
+          type: 'string',
+          description:
+            'Full report content in markdown format. Include headers, tables, bold text as needed.',
+        },
+        format: {
+          type: 'string',
+          enum: ['pdf', 'markdown'],
+          description:
+            'Output format. Default to markdown unless PDF specifically requested.',
+        },
+      },
+      required: ['title', 'content'],
+    },
+  },
 ];
 
 async function executeWithTimeout<T>(
@@ -163,6 +189,39 @@ async function handleToolCall(
       } catch (error) {
         return JSON.stringify({
           error: error instanceof Error ? error.message : 'Failed to read file',
+        });
+      }
+    }
+
+    case 'generate_report': {
+      const title = toolInput.title as string;
+      const content = toolInput.content as string;
+      const format = (toolInput.format as string) || 'markdown';
+      try {
+        const baseUrl = process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+        const res = await executeWithTimeout(
+          () =>
+            fetch(`${baseUrl}/api/report`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ title, content, format }),
+            }).then(async (r) => {
+              if (!r.ok) {
+                const err = await r.json().catch(() => ({}));
+                throw new Error(
+                  (err as Record<string, string>).error || `Report API returned ${r.status}`
+                );
+              }
+              return r.json();
+            }),
+          30000 // Reports may take longer than default timeout
+        );
+        return JSON.stringify(res);
+      } catch (error) {
+        return JSON.stringify({
+          error: error instanceof Error ? error.message : 'Failed to generate report',
         });
       }
     }
@@ -290,6 +349,7 @@ export async function POST(req: Request) {
     const readable = new ReadableStream({
       async start(controller) {
         let fullResponse = '';
+        let reportMeta: Record<string, unknown> | null = null;
         const MAX_TOOL_ROUNDS = 10;
 
         try {
@@ -355,6 +415,35 @@ export async function POST(req: Request) {
                   content: result,
                 });
 
+                // Capture report metadata and notify client
+                if (block.name === 'generate_report') {
+                  try {
+                    const reportResult = JSON.parse(result);
+                    if (reportResult.url) {
+                      reportMeta = {
+                        report_generated: true,
+                        report_title: reportResult.title,
+                        report_url: reportResult.url,
+                        report_format: reportResult.format,
+                        report_expires: reportResult.expires,
+                      };
+                      controller.enqueue(
+                        encoder.encode(
+                          `data: ${JSON.stringify({
+                            type: 'report_ready',
+                            title: reportResult.title,
+                            url: reportResult.url,
+                            format: reportResult.format,
+                            expires: reportResult.expires,
+                          })}\n\n`
+                        )
+                      );
+                    }
+                  } catch {
+                    // Report parsing failed — tool result will still reach Claude
+                  }
+                }
+
                 // Notify client that the tool completed
                 controller.enqueue(
                   encoder.encode(
@@ -381,9 +470,14 @@ export async function POST(req: Request) {
             ];
           }
 
-          // Save assistant response
+          // Save assistant response (with report metadata if generated)
           try {
-            await saveMessage(convId, 'assistant', fullResponse);
+            await saveMessage(
+              convId,
+              'assistant',
+              fullResponse,
+              reportMeta || undefined
+            );
           } catch {
             // Continue without persistence
           }
