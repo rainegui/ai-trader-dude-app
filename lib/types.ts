@@ -11,6 +11,12 @@ export interface Conversation {
   title: string;
   created_at: string;
   updated_at: string;
+  is_deleted?: boolean;
+  summary?: string;
+}
+
+export interface ConversationWithPreview extends Conversation {
+  last_message_preview?: string;
 }
 
 export interface AgentOutput {

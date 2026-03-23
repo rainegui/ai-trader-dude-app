@@ -6,6 +6,7 @@ import ChatArea from './components/ChatArea';
 import InputBar from './components/InputBar';
 import ContextDrawer from './components/ContextDrawer';
 import { RegimeBadge, ConversationList } from './components/DataCards';
+import type { ConversationEntry } from './components/DataCards';
 import type { SSEMessage } from '@/lib/types';
 
 interface ChatMessage {
@@ -20,17 +21,11 @@ interface AgentTriggerStatus {
   timestamp: number;
 }
 
-interface ConversationMeta {
-  id: string;
-  title: string;
-  updated_at: string;
-}
-
 export default function ChatPage() {
   const router = useRouter();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [conversations, setConversations] = useState<ConversationMeta[]>([]);
+  const [conversations, setConversations] = useState<ConversationEntry[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isWaiting, setIsWaiting] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
@@ -38,6 +33,7 @@ export default function ChatPage() {
   const [agentStatuses, setAgentStatuses] = useState<AgentTriggerStatus[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [regime, setRegime] = useState<string | null>(null);
+  const [loadingConversation, setLoadingConversation] = useState(false);
 
   // Auth check
   useEffect(() => {
@@ -55,13 +51,10 @@ export default function ChatPage() {
 
   async function loadConversations() {
     try {
-      const res = await fetch('/api/github/read', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: '_conversations_placeholder' }),
-      });
-      // For now, conversations come from Supabase through a dedicated endpoint
-      // This is a stub — we'll load from the chat API response
+      const res = await fetch('/api/conversations');
+      if (!res.ok) return;
+      const data = await res.json();
+      setConversations(data);
     } catch {
       // Silent fail
     }
@@ -82,18 +75,97 @@ export default function ChatPage() {
   }
 
   async function loadConversation(convId: string) {
+    if (loadingConversation || convId === conversationId) {
+      setSidebarOpen(false);
+      return;
+    }
+
+    setLoadingConversation(true);
     setConversationId(convId);
     setMessages([]);
-    // Messages would be loaded from Supabase via API
-    // For now, start fresh per conversation
     setSidebarOpen(false);
+    setAgentStatuses([]);
+
+    try {
+      const res = await fetch(`/api/conversations/${convId}/messages`);
+      if (!res.ok) throw new Error('Failed to load messages');
+      const data = await res.json();
+
+      const loadedMessages: ChatMessage[] = data.map(
+        (m: { id: string; role: string; content: string }) => ({
+          id: m.id,
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+        })
+      );
+
+      setMessages(loadedMessages);
+    } catch {
+      // If we can't load messages, still switch to the conversation
+    } finally {
+      setLoadingConversation(false);
+    }
   }
 
   function startNewConversation() {
     setConversationId(null);
     setMessages([]);
+    setAgentStatuses([]);
     setSidebarOpen(false);
   }
+
+  async function deleteConversation(convId: string) {
+    try {
+      await fetch(`/api/conversations/${convId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_deleted: true }),
+      });
+
+      // Remove from local list immediately
+      setConversations((prev) => prev.filter((c) => c.id !== convId));
+
+      // If we're deleting the active conversation, start fresh
+      if (convId === conversationId) {
+        startNewConversation();
+      }
+    } catch {
+      // Silent fail
+    }
+  }
+
+  // Refresh conversation list after a message exchange completes
+  const refreshConversationList = useCallback(
+    (activeConvId: string, firstUserMessage?: string) => {
+      // Update the conversation in the local list
+      setConversations((prev) => {
+        const existing = prev.find((c) => c.id === activeConvId);
+        if (existing) {
+          // Move to top and update timestamp
+          return [
+            {
+              ...existing,
+              updated_at: new Date().toISOString(),
+              title: existing.title || firstUserMessage?.substring(0, 50) || 'New conversation',
+            },
+            ...prev.filter((c) => c.id !== activeConvId),
+          ];
+        } else {
+          // New conversation — add to top
+          return [
+            {
+              id: activeConvId,
+              title: firstUserMessage?.substring(0, 50) || 'New conversation',
+              updated_at: new Date().toISOString(),
+              last_message_preview: null,
+            },
+            ...prev,
+          ];
+        }
+      });
+    },
+    []
+  );
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -160,6 +232,12 @@ export default function ChatPage() {
               } else if (data.type === 'done') {
                 if (data.conversationId) {
                   setConversationId(data.conversationId);
+                  // Refresh sidebar — first message is the title source
+                  const isFirst = !conversationId;
+                  refreshConversationList(
+                    data.conversationId,
+                    isFirst ? content : undefined
+                  );
                 }
               } else if (data.type === 'error') {
                 fullText += `\n\n*Error: ${data.error}*`;
@@ -179,6 +257,21 @@ export default function ChatPage() {
             content: fullText,
           };
           setMessages((prev) => [...prev, assistantMsg]);
+
+          // Update last message preview in the sidebar
+          if (conversationId) {
+            setConversations((prev) =>
+              prev.map((c) =>
+                c.id === conversationId
+                  ? {
+                      ...c,
+                      last_message_preview: fullText.substring(0, 100),
+                      updated_at: new Date().toISOString(),
+                    }
+                  : c
+              )
+            );
+          }
         }
       } catch (error) {
         const errMsg: ChatMessage = {
@@ -193,14 +286,14 @@ export default function ChatPage() {
         setStreamingContent('');
       }
     },
-    [isStreaming, conversationId]
+    [isStreaming, conversationId, refreshConversationList]
   );
 
   return (
     <div className="h-[100dvh] flex bg-bg">
       {/* Sidebar — desktop */}
-      <div className="hidden md:flex w-64 flex-col border-r border-border bg-white">
-        <div className="p-4 border-b border-border">
+      <div className="hidden md:flex w-[260px] flex-shrink-0 flex-col border-r border-[#e8e2e5] bg-[#faf7f5]">
+        <div className="p-4 border-b border-[#e8e2e5]">
           <h1 className="text-lg font-bold text-plum-deep">AI Trader Dude</h1>
         </div>
         <ConversationList
@@ -208,22 +301,23 @@ export default function ChatPage() {
           currentId={conversationId}
           onSelect={loadConversation}
           onNew={startNewConversation}
+          onDelete={deleteConversation}
         />
       </div>
 
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/20 z-30 md:hidden"
+          className="fixed inset-0 bg-black/30 z-30 md:hidden backdrop-blur-[1px]"
           onClick={() => setSidebarOpen(false)}
         />
       )}
       <div
-        className={`fixed top-0 left-0 h-full w-72 bg-white shadow-xl z-40 md:hidden transform transition-transform duration-300 ${
+        className={`fixed top-0 left-0 h-full w-72 bg-[#faf7f5] shadow-xl z-40 md:hidden transform transition-transform duration-300 ease-out ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="p-4 border-b border-border flex items-center justify-between">
+        <div className="p-4 border-b border-[#e8e2e5] flex items-center justify-between">
           <h1 className="text-lg font-bold text-plum-deep">AI Trader Dude</h1>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -249,6 +343,7 @@ export default function ChatPage() {
           currentId={conversationId}
           onSelect={loadConversation}
           onNew={startNewConversation}
+          onDelete={deleteConversation}
         />
       </div>
 

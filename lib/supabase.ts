@@ -40,7 +40,7 @@ export async function getConversationMessages(
     .select('*')
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true })
-    .limit(40);
+    .limit(200);
   return (data as Message[]) || [];
 }
 
@@ -71,12 +71,45 @@ export async function getMemory(): Promise<string> {
 }
 
 export async function getRecentConversations(
-  limit = 10
+  limit = 50
 ): Promise<Conversation[]> {
   const { data } = await supabase
     .from('conversations')
     .select('*')
+    .or('is_deleted.is.null,is_deleted.eq.false')
     .order('updated_at', { ascending: false })
     .limit(limit);
   return (data as Conversation[]) || [];
+}
+
+export async function softDeleteConversation(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('conversations')
+    .update({ is_deleted: true })
+    .eq('id', id);
+  if (error) throw new Error(`Failed to delete conversation: ${error.message}`);
+}
+
+export async function updateConversation(
+  id: string,
+  updates: Partial<Pick<Conversation, 'title' | 'is_deleted' | 'updated_at'>>
+): Promise<void> {
+  const { error } = await supabase
+    .from('conversations')
+    .update(updates)
+    .eq('id', id);
+  if (error) throw new Error(`Failed to update conversation: ${error.message}`);
+}
+
+export async function getLastMessagePreview(
+  conversationId: string
+): Promise<string | null> {
+  const { data } = await supabase
+    .from('messages')
+    .select('content')
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (!data || data.length === 0) return null;
+  return data[0].content.substring(0, 100);
 }
