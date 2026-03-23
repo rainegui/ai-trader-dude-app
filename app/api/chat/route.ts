@@ -113,7 +113,7 @@ async function handleToolCall(
       const context = toolInput.context as string | undefined;
       try {
         const result = await executeWithTimeout(() =>
-          triggerAgentRun({ agents, context })
+          triggerAgentRun({ agents, context, cycle: 'ADHOC' })
         );
         return JSON.stringify(result);
       } catch (error) {
