@@ -71,6 +71,7 @@ export interface SSEMessage {
   tool?: string;
   status?: string;
   result?: unknown;
+  agents?: string[];
 }
 
 export interface MemoryEntry {

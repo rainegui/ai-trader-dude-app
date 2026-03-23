@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import MessageBubble from './MessageBubble';
 import ThinkingIndicator from './ThinkingIndicator';
+import AgentRunStatusBar from './AgentRunStatusBar';
+import type { AgentRunState } from './AgentRunStatusBar';
 
 interface ChatMessage {
   id: string;
@@ -28,6 +30,9 @@ interface ChatAreaProps {
   hasFileAttachment?: boolean;
   agentStatuses?: AgentTriggerStatus[];
   onFileDrop?: (file: File) => void;
+  agentRun?: AgentRunState | null;
+  onCheckResults?: () => void;
+  onDismissAgentRun?: () => void;
 }
 
 const TOOL_LABELS: Record<string, string> = {
@@ -70,6 +75,9 @@ export default function ChatArea({
   hasFileAttachment = false,
   agentStatuses = [],
   onFileDrop,
+  agentRun,
+  onCheckResults,
+  onDismissAgentRun,
 }: ChatAreaProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -132,6 +140,15 @@ export default function ChatArea({
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
+      {/* Agent run status bar — sticky at top of chat area */}
+      {agentRun && onCheckResults && onDismissAgentRun && (
+        <AgentRunStatusBar
+          runState={agentRun}
+          onCheckResults={onCheckResults}
+          onDismiss={onDismissAgentRun}
+        />
+      )}
+
       {/* Drag overlay */}
       {isDragging && (
         <div className="absolute inset-4 border-2 border-dashed border-plum/40 rounded-2xl flex items-center justify-center bg-plum-light/10 z-10 pointer-events-none">

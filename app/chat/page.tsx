@@ -9,6 +9,8 @@ import ContextDrawer from './components/ContextDrawer';
 import { RegimeBadge, ConversationList } from './components/DataCards';
 import type { ConversationEntry } from './components/DataCards';
 import type { SSEMessage } from '@/lib/types';
+import type { AgentRunState } from './components/AgentRunStatusBar';
+import { loadAgentRun, saveAgentRun } from './components/AgentRunStatusBar';
 
 interface ChatMessage {
   id: string;
@@ -50,6 +52,7 @@ export default function ChatPage() {
   const [loadingConversation, setLoadingConversation] = useState(false);
   const [pendingFile, setPendingFile] = useState<FileAttachment | null>(null);
   const [hasFileInFlight, setHasFileInFlight] = useState(false);
+  const [agentRun, setAgentRun] = useState<AgentRunState | null>(null);
 
   // Auth check
   useEffect(() => {
@@ -59,10 +62,11 @@ export default function ChatPage() {
     }
   }, [router]);
 
-  // Load conversations and regime on mount
+  // Load conversations, regime, and persisted agent run state on mount
   useEffect(() => {
     loadConversations();
     loadRegime();
+    setAgentRun(loadAgentRun());
   }, []);
 
   async function loadConversations() {
@@ -291,6 +295,30 @@ export default function ChatPage() {
                       timestamp: Date.now(),
                     },
                   ]);
+
+                  // Persist agent run status bar state when we have agent names
+                  if (data.agents?.length) {
+                    const runState: AgentRunState = {
+                      agents: data.agents,
+                      triggeredAt: Date.now(),
+                      complete: false,
+                    };
+                    setAgentRun(runState);
+                    saveAgentRun(runState);
+                  }
+                }
+
+                // Mark agents complete when check_agent_status or read_github_file completes
+                if (
+                  data.status === 'complete' &&
+                  (data.tool === 'check_agent_status' || data.tool === 'read_github_file')
+                ) {
+                  setAgentRun((prev) => {
+                    if (!prev || prev.complete) return prev;
+                    const updated = { ...prev, complete: true };
+                    saveAgentRun(updated);
+                    return updated;
+                  });
                 }
               } else if (data.type === 'done') {
                 if (data.conversationId) {
@@ -349,6 +377,15 @@ export default function ChatPage() {
     },
     [isStreaming, conversationId, pendingFile, refreshConversationList]
   );
+
+  const handleDismissAgentRun = useCallback(() => {
+    setAgentRun(null);
+    saveAgentRun(null);
+  }, []);
+
+  const handleCheckResults = useCallback(() => {
+    sendMessage('What have we got?');
+  }, [sendMessage]);
 
   return (
     <div className="h-[100dvh] flex flex-col bg-bg">
@@ -476,6 +513,9 @@ export default function ChatPage() {
             hasFileAttachment={hasFileInFlight}
             agentStatuses={agentStatuses}
             onFileDrop={handleFileDrop}
+            agentRun={agentRun}
+            onCheckResults={handleCheckResults}
+            onDismissAgentRun={handleDismissAgentRun}
           />
 
           {/* Input bar — bottom of chat column */}

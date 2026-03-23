@@ -325,13 +325,21 @@ export async function POST(req: Request) {
                 hasToolUse = true;
 
                 // Notify client that a tool is being called
+                const toolStatusRunning: Record<string, unknown> = {
+                  type: 'tool_status',
+                  tool: block.name,
+                  status: 'running',
+                };
+                // Include agent names for trigger tools so the UI can display them
+                const toolInput = block.input as Record<string, unknown>;
+                if (block.name === 'trigger_agent_run' && Array.isArray(toolInput.agents)) {
+                  toolStatusRunning.agents = toolInput.agents;
+                } else if (block.name === 'trigger_full_cycle') {
+                  toolStatusRunning.agents = ['news-scout', 'coordinator', 'economist', 'game-theory'];
+                }
                 controller.enqueue(
                   encoder.encode(
-                    `data: ${JSON.stringify({
-                      type: 'tool_status',
-                      tool: block.name,
-                      status: 'running',
-                    })}\n\n`
+                    `data: ${JSON.stringify(toolStatusRunning)}\n\n`
                   )
                 );
 
