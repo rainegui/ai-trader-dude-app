@@ -96,6 +96,7 @@ export async function buildSystemPrompt(): Promise<string> {
     unicornPipeline,
     tradingSystemRef,
     earlyWarningDashboard,
+    dataIntegrityRules,
   ] = await Promise.all([
     readGitHubFile('state/atd-sop.md'),
     readGitHubFile('state/atd-knowledge/trading-fundamentals.md'),
@@ -114,6 +115,7 @@ export async function buildSystemPrompt(): Promise<string> {
     readGitHubFile('state/unicorn-pipeline.json'),
     readGitHubFile('state/atd-knowledge/trading-system-reference.md'),
     readGitHubFile('state/atd-knowledge/early-warning-dashboard.md'),
+    readGitHubFile('state/atd-knowledge/data-integrity-rules.md'),
   ]);
 
   // Fetch memory from Supabase
@@ -124,7 +126,15 @@ export async function buildSystemPrompt(): Promise<string> {
     // Supabase may be unavailable
   }
 
-  return `Current date and time: ${now} ${tzAbbr}
+  return `[DATA INTEGRITY — MANDATORY]
+All verifiable data must come from MCP tools (FRED for economic data, Alpha Vantage for prices, FMP for calendars).
+Web search is for narrative context only — never for dates, prices, or data values.
+Never present unverified claims as facts. Every factual claim must cite its source.
+Never "correct" a previous date or number without verifying against the primary MCP source first.
+If you cannot verify something, say so — never guess.
+Full rules: state/atd-knowledge/data-integrity-rules.md
+
+Current date and time: ${now} ${tzAbbr}
 Raine is in Sydney, Australia. Always use Sydney time for timestamps.
 
 ${atdSop || ''}
