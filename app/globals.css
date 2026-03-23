@@ -11,8 +11,11 @@
   --color-border: #e8e0dd;
   --color-input-focus: #b5838d;
 
-  --font-sans: "Inter", "DM Sans", system-ui, sans-serif;
-  --font-mono: "DM Mono", ui-monospace, monospace;
+  --font-sans: var(--font-dm-sans), "DM Sans", system-ui, sans-serif;
+  --font-mono: var(--font-dm-mono), "DM Mono", ui-monospace, monospace;
+
+  /* Custom breakpoint for three-column layout */
+  --breakpoint-2lg: 1100px;
 }
 
 html,

@@ -351,136 +351,148 @@ export default function ChatPage() {
   );
 
   return (
-    <div className="h-[100dvh] flex bg-bg">
-      {/* Sidebar — desktop */}
-      <div className="hidden md:flex w-[260px] flex-shrink-0 flex-col border-r border-[#e8e2e5] bg-[#faf7f5]">
-        <div className="p-4 border-b border-[#e8e2e5]">
-          <h1 className="text-lg font-bold text-plum-deep">AI Trader Dude</h1>
-        </div>
-        <ConversationList
-          conversations={conversations}
-          currentId={conversationId}
-          onSelect={loadConversation}
-          onNew={startNewConversation}
-          onDelete={deleteConversation}
-        />
-      </div>
-
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/30 z-30 md:hidden backdrop-blur-[1px]"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-      <div
-        className={`fixed top-0 left-0 h-full w-72 bg-[#faf7f5] shadow-xl z-40 md:hidden transform transition-transform duration-300 ease-out ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        <div className="p-4 border-b border-[#e8e2e5] flex items-center justify-between">
-          <h1 className="text-lg font-bold text-plum-deep">AI Trader Dude</h1>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-bg"
+    <div className="h-[100dvh] flex flex-col bg-bg">
+      {/* ── Header ── spans full width ── */}
+      <header className="flex items-center gap-3 px-4 py-3 bg-plum-deep text-white flex-shrink-0 z-20">
+        {/* Hamburger — mobile only */}
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors"
+          aria-label="Open menu"
+        >
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
           >
-            <svg
-              className="w-5 h-5 text-muted"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+            />
+          </svg>
+        </button>
+
+        {/* Title — centred on mobile, hidden on desktop (title is in sidebar) */}
+        <div className="md:hidden flex-1 text-center">
+          <h1 className="text-base font-semibold">AI Trader Dude</h1>
         </div>
-        <ConversationList
-          conversations={conversations}
-          currentId={conversationId}
-          onSelect={loadConversation}
-          onNew={startNewConversation}
-          onDelete={deleteConversation}
-        />
-      </div>
 
-      {/* Main chat area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <header className="flex items-center gap-3 px-4 py-3 border-b border-border bg-white">
-          {/* Hamburger — mobile */}
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg hover:bg-bg"
+        {/* Desktop: regime badge in header (title is in sidebar) */}
+        <div className="hidden md:flex flex-1 items-center gap-2">
+          <RegimeBadge regime={regime} />
+        </div>
+
+        {/* Context toggle — hidden on wide desktop where panel is inline */}
+        <button
+          onClick={() => setDrawerOpen((prev) => !prev)}
+          className="2lg:hidden w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors"
+          title="View context"
+        >
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
           >
-            <svg
-              className="w-5 h-5 text-text"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-              />
-            </svg>
-          </button>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"
+            />
+          </svg>
+        </button>
+      </header>
 
-          <h1 className="text-base font-semibold text-plum-deep md:hidden">
-            ATD
-          </h1>
-
-          <div className="flex-1 flex items-center gap-2">
-            <RegimeBadge regime={regime} />
+      {/* ── Body: sidebar + chat + context ── */}
+      <div className="flex-1 flex min-h-0">
+        {/* ── Left sidebar — desktop (≥768px) ── */}
+        <aside className="hidden md:flex w-[260px] flex-shrink-0 flex-col border-r border-[#e8e2e5] bg-[#faf7f5]">
+          <div className="px-4 py-3 border-b border-[#e8e2e5]">
+            <h2 className="text-base font-bold text-plum-deep">AI Trader Dude</h2>
           </div>
+          <ConversationList
+            conversations={conversations}
+            currentId={conversationId}
+            onSelect={loadConversation}
+            onNew={startNewConversation}
+            onDelete={deleteConversation}
+          />
+        </aside>
 
-          {/* Context button */}
-          <button
-            onClick={() => setDrawerOpen(true)}
-            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-bg transition-colors"
-            title="View context"
-          >
-            <svg
-              className="w-5 h-5 text-muted"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
+        {/* ── Mobile sidebar overlay ── */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/30 z-30 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+        <aside
+          className={`fixed top-0 left-0 h-full w-72 bg-[#faf7f5] shadow-xl z-40 md:hidden flex flex-col transform transition-transform duration-250 ease-out ${
+            sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          <div className="px-4 py-3 border-b border-[#e8e2e5] flex items-center justify-between flex-shrink-0">
+            <h2 className="text-base font-bold text-plum-deep">AI Trader Dude</h2>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-bg"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"
-              />
-            </svg>
-          </button>
-        </header>
+              <svg
+                className="w-5 h-5 text-muted"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+          <ConversationList
+            conversations={conversations}
+            currentId={conversationId}
+            onSelect={loadConversation}
+            onNew={startNewConversation}
+            onDelete={deleteConversation}
+          />
+        </aside>
 
-        {/* Chat */}
-        <ChatArea
-          messages={messages}
-          streamingContent={streamingContent}
-          isStreaming={isStreaming}
-          isWaiting={isWaiting}
-          hasFileAttachment={hasFileInFlight}
-          agentStatuses={agentStatuses}
-          onFileDrop={handleFileDrop}
-        />
+        {/* ── Centre: chat column ── */}
+        <main className="flex-1 flex flex-col min-w-0">
+          {/* Chat messages — scrollable */}
+          <ChatArea
+            messages={messages}
+            streamingContent={streamingContent}
+            isStreaming={isStreaming}
+            isWaiting={isWaiting}
+            hasFileAttachment={hasFileInFlight}
+            agentStatuses={agentStatuses}
+            onFileDrop={handleFileDrop}
+          />
 
-        {/* Input */}
-        <InputBar onSend={sendMessage} disabled={isStreaming} />
+          {/* Input bar — bottom of chat column */}
+          <InputBar onSend={sendMessage} disabled={isStreaming} />
+        </main>
+
+        {/* ── Right panel — desktop ≥1100px, inline context ── */}
+        <aside className="hidden 2lg:flex w-[300px] flex-shrink-0 flex-col border-l border-[#e8e2e5] bg-white overflow-y-auto chat-scroll">
+          <ContextDrawer isOpen={true} onClose={() => {}} inline />
+        </aside>
       </div>
 
-      {/* Context drawer */}
+      {/* ── Mobile/tablet context drawer (overlay) — shown below 1100px ── */}
       <ContextDrawer
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
+        inline={false}
       />
     </div>
   );

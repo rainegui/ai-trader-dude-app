@@ -118,8 +118,8 @@ export default function InputBar({ onSend, disabled }: InputBarProps) {
   };
 
   return (
-    <div className="border-t border-border bg-white px-4 py-3 pb-[env(safe-area-inset-bottom,12px)]">
-      <div className="max-w-2xl mx-auto">
+    <div className="border-t border-border bg-white px-4 py-3 pb-[max(env(safe-area-inset-bottom,0px),12px)]">
+      <div className="max-w-[640px] mx-auto">
         {/* File preview chip */}
         {attachment && (
           <div className="mb-2 inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[#e8e2e5] bg-white">

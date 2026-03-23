@@ -5,6 +5,8 @@ import { useState, useEffect } from 'react';
 interface ContextDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+  /** When true, renders as a static inline panel (no overlay/backdrop) */
+  inline?: boolean;
 }
 
 interface SectionData {
@@ -13,7 +15,7 @@ interface SectionData {
   watchlist: string | null;
 }
 
-export default function ContextDrawer({ isOpen, onClose }: ContextDrawerProps) {
+export default function ContextDrawer({ isOpen, onClose, inline = false }: ContextDrawerProps) {
   const [data, setData] = useState<SectionData>({
     portfolio: null,
     themes: null,
@@ -27,10 +29,10 @@ export default function ContextDrawer({ isOpen, onClose }: ContextDrawerProps) {
   });
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen || inline) {
       fetchData();
     }
-  }, [isOpen]);
+  }, [isOpen, inline]);
 
   async function fetchData() {
     setLoading(true);
@@ -79,19 +81,85 @@ export default function ContextDrawer({ isOpen, onClose }: ContextDrawerProps) {
     }
   }
 
+  const panelContent = (
+    <>
+      {loading && (
+        <p className="text-muted text-sm text-center py-4">Loading...</p>
+      )}
+
+      <Section
+        title="Portfolio"
+        expanded={expanded.portfolio}
+        onToggle={() => toggleSection('portfolio')}
+      >
+        {renderJson(data.portfolio, 'portfolio')}
+      </Section>
+
+      <Section
+        title="Active Themes"
+        expanded={expanded.themes}
+        onToggle={() => toggleSection('themes')}
+      >
+        {renderJson(data.themes, 'themes')}
+      </Section>
+
+      <Section
+        title="Watchlist"
+        expanded={expanded.watchlist}
+        onToggle={() => toggleSection('watchlist')}
+      >
+        {renderJson(data.watchlist, 'watchlist')}
+      </Section>
+    </>
+  );
+
+  // ── Inline mode: static panel, no overlay ──
+  if (inline) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <h2 className="text-sm font-semibold text-plum-deep">Context</h2>
+          <button
+            onClick={fetchData}
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-bg transition-colors"
+            title="Refresh"
+          >
+            <svg
+              className="w-3.5 h-3.5 text-muted"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182"
+              />
+            </svg>
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto chat-scroll p-3 space-y-3">
+          {panelContent}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Overlay mode: slide-in drawer ──
   return (
     <>
       {/* Backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/20 z-40 md:hidden"
+          className="fixed inset-0 bg-black/20 z-40 2lg:hidden"
           onClick={onClose}
         />
       )}
 
       {/* Drawer */}
       <div
-        className={`fixed top-0 right-0 h-full w-80 bg-white shadow-xl z-50 transform transition-transform duration-300 ${
+        className={`fixed top-0 right-0 h-full w-80 bg-white shadow-xl z-50 2lg:hidden transform transition-transform duration-250 ease-out ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -118,36 +186,7 @@ export default function ContextDrawer({ isOpen, onClose }: ContextDrawerProps) {
         </div>
 
         <div className="overflow-y-auto h-[calc(100%-57px)] p-4 space-y-3">
-          {loading && (
-            <p className="text-muted text-sm text-center py-4">Loading...</p>
-          )}
-
-          {/* Portfolio */}
-          <Section
-            title="Portfolio"
-            expanded={expanded.portfolio}
-            onToggle={() => toggleSection('portfolio')}
-          >
-            {renderJson(data.portfolio, 'portfolio')}
-          </Section>
-
-          {/* Active Themes */}
-          <Section
-            title="Active Themes"
-            expanded={expanded.themes}
-            onToggle={() => toggleSection('themes')}
-          >
-            {renderJson(data.themes, 'themes')}
-          </Section>
-
-          {/* Watchlist */}
-          <Section
-            title="Watchlist"
-            expanded={expanded.watchlist}
-            onToggle={() => toggleSection('watchlist')}
-          >
-            {renderJson(data.watchlist, 'watchlist')}
-          </Section>
+          {panelContent}
         </div>
       </div>
     </>

@@ -45,7 +45,7 @@ function AgentStatusCard({ statuses }: { statuses: AgentTriggerStatus[] }) {
 
   return (
     <div className="flex justify-start mb-4">
-      <div className="max-w-[85%] md:max-w-[75%] rounded-2xl px-4 py-3 bg-plum-deep/5 border border-plum/20 text-sm">
+      <div className="max-w-[90%] md:max-w-[85%] rounded-2xl px-4 py-3 bg-plum-deep/5 border border-plum/20 text-sm">
         <div className="flex items-center gap-2 mb-1">
           <span className="text-base">{isComplete ? '✓' : '🔄'}</span>
           <span className="font-semibold text-plum-deep">
@@ -159,7 +159,7 @@ export default function ChatArea({
         </div>
       )}
 
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-[640px] mx-auto">
         {messages.length === 0 && !isStreaming && (
           <div className="flex flex-col items-center justify-center h-full min-h-[50vh] text-center">
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-plum-light mb-6">
